@@ -19,6 +19,7 @@ import numpy as np
 
 OUTPUTS = Path(__file__).resolve().parent.parent / "outputs"
 EVAL_SEEDS = range(100_000, 100_050)  # 50 seeds, the same for every model
+ACTION_LOW, ACTION_HIGH = 0.0, 512.0  # valid action range (pixels)
 
 
 def load_data():
@@ -58,7 +59,10 @@ def run_episode(policy, seed, render=False):
         if render:
             frames.append(env.render())
         x = np.concatenate([obs["agent_pos"], obs["environment_state"]]).astype(np.float32)
-        obs, reward, terminated, truncated, info = env.step(policy(x))
+        # gym-pusht does not clip actions: a target far outside the workspace makes the
+        # agent accelerate through the walls. Keep every action inside [0, 512].
+        action = np.clip(policy(x), ACTION_LOW, ACTION_HIGH)
+        obs, reward, terminated, truncated, info = env.step(action)
         max_reward = max(max_reward, reward)
         success = success or info["is_success"]
         path.append(obs["agent_pos"])
