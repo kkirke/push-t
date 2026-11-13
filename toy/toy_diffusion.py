@@ -10,7 +10,7 @@ recover both clusters.
 What you implement (Ho et al. 2020, "Denoising Diffusion Probabilistic Models"):
 
   1. Noise schedule. Choose T (e.g. 100) and betas (start with linear,
-     1e-4 -> 0.02). Precompute alphas = 1 - betas and
+     1e-4 -> 0.1; the DDPM paper's 0.02 assumes T=1000). Precompute alphas = 1 - betas and
      alpha_bar = cumprod(alphas).
 
   2. Forward process (adding noise). For clean x0, a random step t, and
@@ -66,9 +66,72 @@ def plot_snapshots(snapshots: dict[int, torch.Tensor], path: Path = OUT / "sampl
     fig.savefig(path, dpi=120)
     print(f"saved {path}")
 
+T = 100
+betas = torch.linspace(1e-4, 0.1, T)
+alphas = 1 - betas
+alpha_bar = torch.cumprod(alphas, dim=0)
+
+def add_noise(x0, t):
+    a = alpha_bar[t].unsqueeze(1)
+    eps = torch.randn_like(x0)
+    x_t = torch.sqrt(a) * x0 + torch.sqrt(1 - a) * eps
+    return x_t, eps
+
+class NoiseModel(torch.nn.Module):
+    def __init__(self, hidden=128):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(3, hidden), 
+            torch.nn.ReLU(),
+            torch.nn.Linear(hidden, hidden),
+            torch.nn.ReLU(),
+            torch.nn.Linear(hidden, hidden),
+            torch.nn.ReLU(),
+            torch.nn.Linear(hidden, 2),
+        )
+
+    def forward(self, x_t, t):
+        t = t.float() / T
+        t = t.unsqueeze(1)
+        h = torch.cat([x_t, t], dim=1)
+        return self.net(h)
 
 if __name__ == "__main__":
     data = sample_data(2000, seed=0)
     plot_snapshots({0: data}, OUT / "data.png")  # what you're trying to generate
 
-    # TODO: noise schedule, model, training loop, sampling loop (see docstring).
+    model = NoiseModel()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+    for step in range(5000):
+        x0 = sample_data(256)                     
+        t = torch.randint(0, T, (256,))
+        x_t, eps = add_noise(x0, t)
+        pred = model(x_t, t)
+        loss = torch.nn.functional.mse_loss(pred, eps)
+
+        optimizer.zero_grad() 
+        loss.backward()       
+        optimizer.step()   
+
+        if step % 500 == 0:
+            print(step, loss.item())
+
+with torch.no_grad():
+    x = torch.randn(2000, 2)
+    snapshots = {99: x}
+    for step in reversed(range(T)):
+        t = torch.full((2000,), step)
+        eps_hat = model(x, t)
+
+        mean = (x - betas[step] / torch.sqrt(1 - alpha_bar[step]) * eps_hat) / torch.sqrt(alphas[step])
+
+        if step > 0:
+            x = mean + torch.sqrt(betas[step]) * torch.randn_like(x)
+        else:
+            x = mean
+
+        if step in (75, 50, 25, 10, 0):
+            snapshots[step] = x
+
+    plot_snapshots(snapshots, OUT / "sampling.png")
