@@ -1,4 +1,4 @@
-"""Step 3 (you write the diffusion parts): DDPM on 2D points, no robots.
+"""DDPM on 2D points, no robots.
 
     uv run python toy/toy_diffusion.py
 
@@ -6,32 +6,6 @@ The data and plotting are provided. Learning a distribution with two separate
 clusters is the same problem as Push-T's "go left or go right": a model trained
 with MSE would put everything in the middle, but a diffusion model should
 recover both clusters.
-
-What you implement (Ho et al. 2020, "Denoising Diffusion Probabilistic Models"):
-
-  1. Noise schedule. Choose T (e.g. 100) and betas (start with linear,
-     1e-4 -> 0.1; the DDPM paper's 0.02 assumes T=1000). Precompute alphas = 1 - betas and
-     alpha_bar = cumprod(alphas).
-
-  2. Forward process (adding noise). For clean x0, a random step t, and
-     eps ~ N(0, I):
-         x_t = sqrt(alpha_bar[t]) * x0 + sqrt(1 - alpha_bar[t]) * eps
-
-  3. Model. An MLP that takes (x_t, t) and predicts eps. It needs to know t:
-     try a sinusoidal embedding of t concatenated to x_t.
-
-  4. Training. loss = MSE(model(x_t, t), eps). That's the whole objective.
-
-  5. Sampling (reverse process). Start from x_T ~ N(0, I). For t = T-1 ... 0:
-         eps_hat = model(x_t, t)
-         mean = (x_t - betas[t] / sqrt(1 - alpha_bar[t]) * eps_hat) / sqrt(alphas[t])
-         x_{t-1} = mean + sqrt(betas[t]) * z,   z ~ N(0, I)  (no noise at t=0)
-
-  6. Plot samples at several t during sampling with plot_snapshots, and compare
-     the final samples to the data.
-
-Experiments once it works: change T; change the schedule; add a third cluster.
-What happens if you train the same MLP with plain MSE to output points directly?
 """
 
 from pathlib import Path
