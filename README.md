@@ -11,7 +11,7 @@ For compute: UW students get 100 free Google Colab credits. You can also use Col
 ```bash
 conda create -n pusht python=3.10 -y
 conda activate pusht
-pip install torch datasets gym-pusht matplotlib "imageio[ffmpeg]" wandb tqdm pytest
+pip install torch datasets gym-pusht scikit-learn matplotlib "imageio[ffmpeg]" tqdm
 # opencv-python and pygame both bundle SDL2 on macOS; keep only the headless OpenCV
 pip uninstall -y opencv-python && pip install --force-reinstall --no-deps opencv-python-headless==4.12.0.88
 python scripts/smoke_test.py
@@ -26,9 +26,10 @@ Matching env: `gym.make("gym_pusht/PushT-v0", obs_type="environment_state_agent_
 
 Run from the repo root with the `pusht` conda env active. Outputs (plots, videos, `results.json`) go to `outputs/`.
 
-| Command | What it does | Time on a laptop |
+| Command | Model | Run time (CPU) |
 | --- | --- | --- |
-| `python -m pusht.mlp_baseline` | MLP behavior cloning (obs → action, MSE), eval on 50 seeds vs. a random policy, failure-case plots and videos | ~1 min |
-| `python -m pusht.toy_diffusion` | DDPM on two 2D clusters, compared with MSE regression | ~30 s |
+| `python -m pusht.linear_baseline` | Linear regression (scikit-learn), features → action | ~15 s |
+| `python -m pusht.mlp_baseline` | 3-layer MLP trained with MSE loss | ~65 s |
+| `python -m pusht.toy_diffusion` | DDPM on two 2D clusters vs. MSE regression | ~20 s |
 
-`pusht/common.py` holds the shared data loading, normalization and evaluation (mean max reward over seeds 100000–100049, same metric as the Diffusion Policy paper).
+`pusht/common.py` loads the data, makes the train/validation split by episode, and evaluates a policy in the simulator: mean max reward over seeds 100000–100049, the same metric as the Diffusion Policy paper.
